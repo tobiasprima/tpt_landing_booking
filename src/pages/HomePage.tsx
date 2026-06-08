@@ -12,20 +12,28 @@ const HomePage = () => {
     <main>
       <section className="hero">
         <p className="eyebrow">{t("hero.eyebrow")}</p>
-        <h1>{business?.settings.hero_title || business?.name || "SewaMobil"}</h1>
+        <h1>{business?.settings.hero_title || business?.name || "Booking Template"}</h1>
         <p>{business?.settings.hero_subtitle || business?.short_description}</p>
         <div className="hero-actions">
-          <Link className="primary-button" to={`/${slug}/booking`}>
+          <Link className="primary-button" to={`/${slug}/catalog`}>
             {t("hero.cta")}
           </Link>
-          <Link className="secondary-button" to={`/${slug}/contact`}>
+          <Link className="secondary-button" to={`/${slug}/booking`}>
             {t("hero.secondary")}
           </Link>
         </div>
       </section>
 
       <section className="section">
-        <h2>Featured Cars</h2>
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">{t("home.featuredEyebrow")}</p>
+            <h2>{t("home.featuredTitle")}</h2>
+          </div>
+          <Link className="text-link" to={`/${slug}/catalog`}>
+            {t("home.viewAll")}
+          </Link>
+        </div>
         <div className="card-grid">
           {services.slice(0, 6).map((service) => (
             <article className="card" key={service.id}>
@@ -41,25 +49,33 @@ const HomePage = () => {
               <strong>
                 Rp {service.price_amount.toLocaleString()} / {service.unit_label}
               </strong>
+              <div className="hero-actions">
+                <Link className="secondary-button" to={`/${slug}/services/${service.slug}`}>
+                  {t("home.learnMore")}
+                </Link>
+                <Link className="primary-button" to={`/${slug}/booking/${service.slug}`}>
+                  {t("home.bookNow")}
+                </Link>
+              </div>
             </article>
           ))}
         </div>
       </section>
 
       <section className="section accent">
-        <h2>Why choose us</h2>
+        <h2>{t("home.whyTitle")}</h2>
         <div className="three-col">
           <div>
-            <h3>Local and friendly</h3>
-            <p>Built for Indonesian rental brands that need a warm, direct booking flow.</p>
+            <h3>{t("home.valueOneTitle")}</h3>
+            <p>{t("home.valueOneBody")}</p>
           </div>
           <div>
-            <h3>Real availability</h3>
-            <p>Customers only book cars that still have units available for the requested time.</p>
+            <h3>{t("home.valueTwoTitle")}</h3>
+            <p>{t("home.valueTwoBody")}</p>
           </div>
           <div>
-            <h3>Fast booking</h3>
-            <p>Choose the car, check the dates, confirm the order, and follow payment instructions.</p>
+            <h3>{t("home.valueThreeTitle")}</h3>
+            <p>{t("home.valueThreeBody")}</p>
           </div>
         </div>
       </section>

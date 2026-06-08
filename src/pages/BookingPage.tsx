@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   useAvailabilityCheck,
@@ -11,7 +11,8 @@ import {
 import { SelectedOptionSnapshotInput } from "../types";
 
 const BookingPage = () => {
-  const { slug = "" } = useParams();
+  const { slug = "", serviceSlug: serviceSlugParam = "" } = useParams();
+  const navigate = useNavigate();
   const { t } = useTranslation();
   const { data: business } = useBusiness(slug);
   const { data: services = [] } = useServices(slug);
@@ -34,6 +35,19 @@ const BookingPage = () => {
   const [selectedOptions, setSelectedOptions] = useState<
     Record<string, SelectedOptionSnapshotInput>
   >({});
+
+  useEffect(() => {
+    if (!serviceSlugParam || services.length === 0) {
+      return;
+    }
+
+    const matchedService = services.find((service) => service.slug === serviceSlugParam);
+    if (!matchedService || matchedService.id === form.service_id) {
+      return;
+    }
+
+    handleServiceSelect(matchedService.id, matchedService.slug);
+  }, [serviceSlugParam, services, form.service_id]);
 
   const handleChange = (key: string, value: string) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -103,13 +117,56 @@ const BookingPage = () => {
     selectedVariant?.price_override_amount ??
     services.find((service) => service.id === form.service_id)?.price_amount ??
     0;
+  const selectedService = services.find((service) => service.id === form.service_id);
+  const whatsappNumber = business?.whatsapp_number?.replace(/\D/g, "");
+
+  const handleAvailabilityCheck = () => {
+    if (!form.service_id || !form.requested_start_at || !form.requested_end_at) {
+      return;
+    }
+
+    availability.mutate({
+      service_id: form.service_id,
+      service_variant_id: form.service_variant_id,
+      requested_start_at: new Date(form.requested_start_at).toISOString(),
+      requested_end_at: new Date(form.requested_end_at).toISOString(),
+    });
+  };
+
+  const handleBookingSubmit = () => {
+    if (!form.service_id || !form.requested_start_at || !form.requested_end_at) {
+      return;
+    }
+
+    createBooking.mutate(
+      {
+        ...form,
+        quantity: Number(form.quantity) || 1,
+        selected_options_snapshot: Object.values(selectedOptions),
+        requested_start_at: new Date(form.requested_start_at).toISOString(),
+        requested_end_at: new Date(form.requested_end_at).toISOString(),
+      },
+      {
+        onSuccess: () => {
+          const query = new URLSearchParams();
+          if (selectedService?.name) {
+            query.set("service", selectedService.name);
+          }
+          if (form.customer_name) {
+            query.set("name", form.customer_name);
+          }
+          navigate(`/${slug}/success?${query.toString()}`);
+        },
+      }
+    );
+  };
 
   return (
     <main className="section">
       <h1>{t("booking.title")}</h1>
       <div className="booking-layout">
         <section className="card">
-          <h2>Select car</h2>
+          <h2>{t("booking.selectOffering")}</h2>
           <div className="service-list">
             {services.map((service) => (
               <button
@@ -118,8 +175,13 @@ const BookingPage = () => {
                 onClick={() => handleServiceSelect(service.id, service.slug)}
                 type="button"
               >
-                <span>{service.name}</span>
-                <strong>Rp {service.price_amount.toLocaleString()}</strong>
+                <span>
+                  <strong>{service.name}</strong>
+                  <small>{service.short_description}</small>
+                </span>
+                <strong>
+                  Rp {service.price_amount.toLocaleString()} / {service.unit_label}
+                </strong>
               </button>
             ))}
           </div>
@@ -145,7 +207,7 @@ const BookingPage = () => {
                       handleOptionChange(group.id, group.name, value.id, value.name);
                     }}
                   >
-                    <option value="">Select {group.name}</option>
+                    <option value="">{t("booking.selectOption", { name: group.name })}</option>
                     {(group.values || []).map((value) => (
                       <option key={value.id} value={value.id}>
                         {value.name}
@@ -157,14 +219,14 @@ const BookingPage = () => {
 
               {serviceDetail.packages.length > 0 && (
                 <label className="full-width">
-                  Package
+                  {t("booking.package")}
                   <select
                     value={form.service_package_id}
                     onChange={(event) =>
                       handleChange("service_package_id", event.target.value)
                     }
                   >
-                    <option value="">Select package</option>
+                    <option value="">{t("booking.selectPackage")}</option>
                     {serviceDetail.packages.map((pkg) => (
                       <option key={pkg.id} value={pkg.id}>
                         {pkg.name}
@@ -175,15 +237,15 @@ const BookingPage = () => {
               )}
 
               <p className="status-message">
-                Estimated price: Rp {displayedPrice.toLocaleString()}
+                {t("booking.estimatedPrice")} Rp {displayedPrice.toLocaleString()}
               </p>
             </>
           )}
 
-          <h2>Schedule & customer</h2>
+          <h2>{t("booking.scheduleAndCustomer")}</h2>
           <div className="field-grid">
             <label>
-              Quantity
+              {t("booking.quantity")}
               <input
                 min="1"
                 type="number"
@@ -192,7 +254,7 @@ const BookingPage = () => {
               />
             </label>
             <label>
-              Pickup
+              {t("booking.start")}
               <input
                 type="datetime-local"
                 value={form.requested_start_at}
@@ -200,7 +262,7 @@ const BookingPage = () => {
               />
             </label>
             <label>
-              Return
+              {t("booking.end")}
               <input
                 type="datetime-local"
                 value={form.requested_end_at}
@@ -208,19 +270,19 @@ const BookingPage = () => {
               />
             </label>
             <label>
-              Name
+              {t("booking.name")}
               <input value={form.customer_name} onChange={(event) => handleChange("customer_name", event.target.value)} />
             </label>
             <label>
-              Phone / WhatsApp
+              {t("booking.phone")}
               <input value={form.customer_phone} onChange={(event) => handleChange("customer_phone", event.target.value)} />
             </label>
             <label>
-              Email
+              {t("booking.email")}
               <input value={form.customer_email} onChange={(event) => handleChange("customer_email", event.target.value)} />
             </label>
             <label className="full-width">
-              Notes
+              {t("booking.notes")}
               <textarea value={form.notes} onChange={(event) => handleChange("notes", event.target.value)} />
             </label>
           </div>
@@ -228,29 +290,16 @@ const BookingPage = () => {
           <div className="hero-actions">
             <button
               className="secondary-button"
-              onClick={() =>
-                availability.mutate({
-                  service_id: form.service_id,
-                  service_variant_id: form.service_variant_id,
-                  requested_start_at: new Date(form.requested_start_at).toISOString(),
-                  requested_end_at: new Date(form.requested_end_at).toISOString(),
-                })
-              }
+              disabled={!form.service_id || !form.requested_start_at || !form.requested_end_at}
+              onClick={handleAvailabilityCheck}
               type="button"
             >
               {t("booking.checkAvailability")}
             </button>
             <button
               className="primary-button"
-              onClick={() =>
-                createBooking.mutate({
-                  ...form,
-                  quantity: Number(form.quantity) || 1,
-                  selected_options_snapshot: Object.values(selectedOptions),
-                  requested_start_at: new Date(form.requested_start_at).toISOString(),
-                  requested_end_at: new Date(form.requested_end_at).toISOString(),
-                })
-              }
+              disabled={!form.service_id || !form.requested_start_at || !form.requested_end_at}
+              onClick={handleBookingSubmit}
               type="button"
             >
               {t("booking.submit")}
@@ -264,9 +313,23 @@ const BookingPage = () => {
                 : availability.data.message}
             </p>
           )}
+          {!createBooking.isSuccess && whatsappNumber && (
+            <p className="status-message">
+              <a
+                className="text-link"
+                href={`https://wa.me/${whatsappNumber}`}
+                rel="noreferrer"
+                target="_blank"
+              >
+                {t("booking.needHelp")}
+              </a>
+            </p>
+          )}
           {createBooking.isSuccess && (
             <p className="status-message success">
-              Booking created. {business?.settings.booking_terms || "Please follow the payment instructions from the business."}
+              {t("booking.created")}{" "}
+              {business?.settings.booking_terms ||
+                t("booking.createdFallback")}
             </p>
           )}
         </section>
